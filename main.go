@@ -3,6 +3,7 @@ package main
 import (
 	"github.com/labstack/echo"
 	"github.com/labstack/echo/middleware"
+	"github.com/ilhamarrouf/echo-graphql/handler"
 	"net/http"
 )
 
@@ -20,6 +21,11 @@ func main()  {
 	app.GET("/", func(c echo.Context) error {
 		return c.HTML(http.StatusOK, "<h1>Echo Framework</h1>")
 	})
+	app.POST("/login", handler.Login)
+
+	auth := app.Group("/auth")
+	auth.Use(middleware.JWT([]byte("secret")))
+	auth.GET("", handler.Auth())
 
 	app.Logger.Fatal(app.Start(":3000"))
 }
