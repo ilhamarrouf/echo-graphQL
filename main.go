@@ -25,7 +25,7 @@ func main()  {
 
 	auth := app.Group("/auth")
 	auth.Use(middleware.JWT([]byte("secret")))
-	auth.GET("", handler.Auth())
+	auth.POST("", handler.Auth())
 
 	app.Logger.Fatal(app.Start(":3000"))
 }
