@@ -4,12 +4,10 @@ import (
 	"bytes"
 	"log"
 	"net/http"
-	"time"
 	"github.com/labstack/echo"
 	"github.com/dgrijalva/jwt-go"
-	"github.com/ilhamarrouf/echo-graphql/db"
-	"github.com/ilhamarrouf/echo-graphql/models"
 	"github.com/ilhamarrouf/echo-graphql/graphql"
+	"github.com/ilhamarrouf/echo-graphql/middlewares"
 )
 
 func Hello() echo.HandlerFunc {
@@ -22,32 +20,18 @@ func Login(c echo.Context) error {
 	username := c.FormValue("username")
 	password := c.FormValue("password")
 
-	db := db.CreateConnection()
-	db.SingularTable(true)
-	user := [] models.User{}
-	db.Find(&user, "name=? and password=?", username, password)
-
-	if len(user) > 0 && username == user[0].Name {
-		token := jwt.New(jwt.SigningMethodHS256)
-		claims := token.Claims.(jwt.MapClaims)
-		claims["name"] = username
-		claims["admin"] = true
-		claims["exp"] = time.Now().Add(time.Hour * 72).Unix()
-
-		t, err := token.SignedString([]byte("secret"))
-		if err != nil {
-			return err
-		}
-
+	tokenString, refreshTokenString, err := middlewares.CreateNewTokens(username, password)
+	if err == nil {
 		return c.JSON(http.StatusOK, map[string]string{
-			"token": t,
+			"token": tokenString,
+			"refresh_token": refreshTokenString,
 		})
 	}
 
 	return echo.ErrUnauthorized
 }
 
-func Auth() echo.HandlerFunc {
+func Restricted() echo.HandlerFunc {
 	return func(c echo.Context) error {
 		user := c.Get("user").(*jwt.Token)
 		_ = user.Claims.(jwt.MapClaims)
@@ -58,5 +42,22 @@ func Auth() echo.HandlerFunc {
 		result := graphql.ExecuteQuery(query)
 
 		return c.JSON(http.StatusOK, result)
+	}
+}
+
+func ReAuth() echo.HandlerFunc {
+	return func(c echo.Context) error {
+		user := c.Get("user").(*jwt.Token)
+		claims := user.Claims.(*middlewares.MyClaim)
+		oldToken := c.FormValue("old_token")
+		tokenString, refreshTokenString, err := middlewares.UpdateRefreshTokenExp(claims, oldToken)
+		if err == nil {
+			return c.JSON(http.StatusOK, map[string]string{
+				"token": tokenString,
+				"refresh_token": refreshTokenString,
+			})
+		}
+
+		return echo.ErrUnauthorized
 	}
 }

@@ -4,7 +4,8 @@ import (
 	"github.com/labstack/echo"
 	"github.com/labstack/echo/middleware"
 	"github.com/ilhamarrouf/echo-graphql/handler"
-	"net/http"
+	ext "github.com/ilhamarrouf/echo-graphql/middlewares"
+	"github.com/ilhamarrouf/echo-graphql/libs"
 )
 
 func main()  {
@@ -18,14 +19,21 @@ func main()  {
 		AllowMethods: []string{echo.GET, echo.POST, echo.PATCH, echo.PUT, echo.DELETE},
 	}))
 
-	app.GET("/", func(c echo.Context) error {
-		return c.HTML(http.StatusOK, "<h1>Echo Framework</h1>")
-	})
-	app.POST("/login", handler.Login)
+	libs.InitDB()
 
-	auth := app.Group("/auth")
-	auth.Use(middleware.JWT([]byte("secret")))
-	auth.POST("", handler.Auth())
+	app.GET("/hello", handler.Hello())
+	app.POST("/login", handler.Login)
+	r1 := app.Group("/restricted")
+	r1.Use(middleware.JWT([]byte("secret1")))
+	r1.POST("", handler.Restricted())
+
+	r2 := app.Group("/reauth")
+	config := middleware.JWTConfig{
+		Claims:     &ext.MyClaim{},
+		SigningKey: []byte("secret2"),
+	}
+	r2.Use(middleware.JWTWithConfig(config))
+	r2.POST("", handler.ReAuth())
 
 	app.Logger.Fatal(app.Start(":3000"))
 }
